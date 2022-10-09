@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HotelListing.API.Data;
+using HotelListing.API.Models.Country;
+using AutoMapper;
 
 namespace HotelListing.API.Controllers
 {
@@ -14,31 +16,40 @@ namespace HotelListing.API.Controllers
     public class CountriesController : ControllerBase
     {
         private readonly HotelListingDbContext _context;
+        private readonly IMapper _mapper;
 
-        public CountriesController(HotelListingDbContext context)
+        public CountriesController(HotelListingDbContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/Countries
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Country>>> GetCountries()
+        public async Task<ActionResult<IEnumerable<GetCountryDTO>>> GetCountries()
         {
-            return await _context.Countries.ToListAsync();
+            var Country = await _context.Countries.ToListAsync();
+            var Records = _mapper.Map<List<GetCountryDTO>>(Country);
+            return Ok(Records);
         }
 
         // GET: api/Countries/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Country>> GetCountry(int id)
+        public async Task<ActionResult<CountryDTO>> GetCountry(int id)
         {
-            var country = await _context.Countries.FindAsync(id);
+            var countryOld = await _context.Countries.FindAsync(id);
+
+            var country = await _context.Countries.Include(q => q.Hotels)
+                .FirstOrDefaultAsync(q => q.Id == id);
 
             if (country == null)
             {
                 return NotFound();
             }
 
-            return Ok(country);
+            var CounntryDto = _mapper.Map<CountryDTO>(country);
+
+            return Ok(CounntryDto);
         }
 
         // PUT: api/Countries/5
@@ -75,8 +86,17 @@ namespace HotelListing.API.Controllers
         // POST: api/Countries
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Country>> PostCountry(Country country)
+        public async Task<ActionResult<Country>> PostCountry(CreateCountryDTO cerateCountryDto)
         {
+            var countryOld = new Country
+            {
+                Name = cerateCountryDto.Name,
+                ShortName = cerateCountryDto.ShortName
+
+            };
+
+            var country = _mapper.Map<Country>(cerateCountryDto);
+
             _context.Countries.Add(country);
             await _context.SaveChangesAsync();
 
